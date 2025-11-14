@@ -1,8 +1,9 @@
-name: Daily Activity Log
+name: ‌‌
 
 on:
   schedule:
-    - cron: "30 4 * * *"   # Runs daily at 10:00 AM IST
+    - cron: "30 4 * * *"    # 10 AM IST
+    - cron: "30 16 * * *"   # 10 PM IST
   workflow_dispatch:
 
 jobs:
@@ -10,16 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: ‌‌
         uses: actions/checkout@v3
 
-      - name: Update log file
+      - name: ‌‌
         run: echo "Update — $(date)" >> activity-log.txt
 
-      - name: Commit changes
+      - name: ‌‌
         run: |
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "github-actions@users.noreply.github.com"
           git add activity-log.txt
-          git commit -m "Daily log update"
+          git commit -m "Auto log update"
           git push
