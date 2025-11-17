@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Update log
-        run: echo "Update on $(date)" >> activity-log.txt
+        run: echo "@webdevpraveen active on $(date)" >> activity-log.txt
 
       - name: Commit & Push as REAL USER
         run: |
