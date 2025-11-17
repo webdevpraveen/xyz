@@ -1,11 +1,9 @@
 name: Daily Contribution Commit
 
 on:
-schedule:
-    # 10 AM IST  → 04:30 UTC
-    - cron: "30 4 * * *"
-    # 10 PM IST  → 16:30 UTC
-    - cron: "30 16 * * *"
+  schedule:
+    - cron: "30 4 * * *"     # 10 AM IST
+    - cron: "30 16 * * *"    # 10 PM IST
   workflow_dispatch:
 
 jobs:
@@ -25,5 +23,5 @@ jobs:
           git config --global user.name "webdevpraveen"
 
           git add .
-          git commit -m "Daily streak update $(date)" || exit 0
-          git push https://webdevpraveen:${{ secrets.PAT }}@github.com/webdevpraveen/xyz.git
+          git commit -m "Auto update $(date)" || exit 0
+          git push https://webdevpraveen:${{ secrets.PAT }}@github.com/webdevpraveen/YOUR-REPO-NAME.git
