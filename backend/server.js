@@ -6,77 +6,93 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-  },
+  cors: { origin: "*" },
 });
 
-// In-memory anonymous state
-let waitingUser = null;              // socket.id
-const pairs = new Map();             // socket.id -> partner socket.id
+// =======================
+// In-memory state
+// =======================
+const waitingQueue = [];              // socket.id[]
+const activePairs = new Map();        // socket.id -> partner.id
 
+// =======================
+// Helpers
+// =======================
+function removeFromQueue(socketId) {
+  const index = waitingQueue.indexOf(socketId);
+  if (index !== -1) waitingQueue.splice(index, 1);
+}
+
+function cleanupSocket(socketId) {
+  // remove from waiting queue
+  removeFromQueue(socketId);
+
+  // remove from active pair
+  const partner = activePairs.get(socketId);
+  if (partner) {
+    activePairs.delete(partner);
+    io.to(partner).emit("partner-left");
+  }
+  activePairs.delete(socketId);
+}
+
+// =======================
+// Socket logic
+// =======================
 io.on("connection", (socket) => {
   console.log("Connected:", socket.id);
 
-  // User clicks Start
   socket.on("start", () => {
-    if (waitingUser && waitingUser !== socket.id) {
-      const partner = waitingUser;
-      waitingUser = null;
+    // prevent duplicates
+    cleanupSocket(socket.id);
 
-      pairs.set(socket.id, partner);
-      pairs.set(partner, socket.id);
+    // add to waiting queue
+    waitingQueue.push(socket.id);
+    socket.emit("waiting");
 
-      io.to(socket.id).emit("matched", { initiator: true });
-      io.to(partner).emit("matched", { initiator: false });
+    // pair if possible
+    if (waitingQueue.length >= 2) {
+      const userA = waitingQueue.shift();
+      const userB = waitingQueue.shift();
 
-      console.log("Paired:", socket.id, partner);
-    } else {
-      waitingUser = socket.id;
-      socket.emit("waiting");
-      console.log("Waiting:", socket.id);
+      activePairs.set(userA, userB);
+      activePairs.set(userB, userA);
+
+      io.to(userA).emit("matched", { initiator: true });
+      io.to(userB).emit("matched", { initiator: false });
+
+      console.log("Paired:", userA, userB);
     }
   });
 
-  // WebRTC signaling
   socket.on("offer", (offer) => {
-    const partner = pairs.get(socket.id);
+    const partner = activePairs.get(socket.id);
     if (partner) io.to(partner).emit("offer", offer);
   });
 
   socket.on("answer", (answer) => {
-    const partner = pairs.get(socket.id);
+    const partner = activePairs.get(socket.id);
     if (partner) io.to(partner).emit("answer", answer);
   });
 
   socket.on("ice-candidate", (candidate) => {
-    const partner = pairs.get(socket.id);
+    const partner = activePairs.get(socket.id);
     if (partner) io.to(partner).emit("ice-candidate", candidate);
   });
 
-  // Next / Skip
   socket.on("next", () => {
-    cleanup(socket.id);
+    cleanupSocket(socket.id);
     socket.emit("reset");
+    socket.emit("waiting");
+    waitingQueue.push(socket.id);
   });
 
   socket.on("disconnect", () => {
-    cleanup(socket.id);
     console.log("Disconnected:", socket.id);
+    cleanupSocket(socket.id);
   });
-
-  function cleanup(id) {
-    if (waitingUser === id) waitingUser = null;
-
-    const partner = pairs.get(id);
-    if (partner) {
-      pairs.delete(partner);
-      io.to(partner).emit("partner-left");
-    }
-    pairs.delete(id);
-  }
 });
 
 server.listen(3000, () => {
-  console.log("Signaling server running on http://localhost:3000");
+  console.log("Signaling server running on port 3000");
 });

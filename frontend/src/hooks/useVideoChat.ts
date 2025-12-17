@@ -71,7 +71,7 @@ export const useVideoChat = () => {
 
   // ---------------- SOCKET ----------------
   const connectToSignalingServer = useCallback(() => {
-    const socket = io("http://localhost:3000");
+    const socket = io(import.meta.env.VITE_BACKEND_URL as string);
     socketRef.current = socket;
 
     socket.on("waiting", () => {
