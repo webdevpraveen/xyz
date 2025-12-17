@@ -15,20 +15,16 @@ export const useVideoChat = () => {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteStreamRef = useRef<MediaStream>(new MediaStream());
+  const remoteStreamRef = useRef<MediaStream | null>(null);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
-  //  AUDIO REFS (created after user interaction)
   const joinAudioRef = useRef<HTMLAudioElement | null>(null);
   const leaveAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  //  vibration helper
   const vibrate = (pattern: number | number[]) => {
-    if ("vibrate" in navigator) {
-      navigator.vibrate(pattern);
-    }
+    if ("vibrate" in navigator) navigator.vibrate(pattern);
   };
 
   // ---------------- CAMERA ----------------
@@ -52,8 +48,7 @@ export const useVideoChat = () => {
 
       setHasLocalStream(true);
       return true;
-    } catch (err) {
-      console.error(err);
+    } catch {
       setStatus("error");
       setErrorMessage("Camera permission denied");
       return false;
@@ -67,26 +62,45 @@ export const useVideoChat = () => {
     });
 
     peerConnectionRef.current = pc;
+    remoteStreamRef.current = new MediaStream();
 
     localStreamRef.current?.getTracks().forEach((track) => {
       pc.addTrack(track, localStreamRef.current!);
     });
 
     pc.ontrack = (event) => {
-      event.streams[0]?.getTracks().forEach((track) => {
-        remoteStreamRef.current.addTrack(track);
+      const remoteStream = remoteStreamRef.current!;
+      event.streams[0].getTracks().forEach((track) => {
+        if (!remoteStream.getTracks().includes(track)) {
+          remoteStream.addTrack(track);
+        }
       });
 
-      const remoteVideo = remoteVideoRef.current;
-      if (remoteVideo && remoteVideo.srcObject !== remoteStreamRef.current) {
-        remoteVideo.srcObject = remoteStreamRef.current;
-        remoteVideo.playsInline = true;
-        remoteVideo.onloadedmetadata = () => remoteVideo.play().catch(() => {});
+      if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+        remoteVideoRef.current.playsInline = true;
+        remoteVideoRef.current.play().catch(() => {});
       }
 
       setHasRemoteStream(true);
-      setIsConnected(true);
-      setStatus("connected");
+    };
+
+    //  ICE STATE CONTROL
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState;
+      console.log("ICE state:", state);
+
+      if (state === "connected" || state === "completed") {
+        setIsConnected(true);
+        setStatus("connected");
+      }
+
+      if (state === "failed" || state === "disconnected") {
+        console.warn("ICE failed, restarting...");
+        pc.restartIce();
+        setIsConnected(false);
+        setStatus("searching");
+      }
     };
 
     pc.onicecandidate = (event) => {
@@ -106,9 +120,8 @@ export const useVideoChat = () => {
     socket.on("waiting", () => setStatus("searching"));
 
     socket.on("matched", async ({ initiator }) => {
-      //  JOIN ALERT
       joinAudioRef.current?.play().catch(() => {});
-      vibrate([200, 100, 200]);
+      vibrate([150, 100, 150]);
 
       if (!peerConnectionRef.current) return;
 
@@ -138,25 +151,22 @@ export const useVideoChat = () => {
     });
 
     socket.on("partner-left", () => {
-      //  LEAVE ALERT
       leaveAudioRef.current?.play().catch(() => {});
-      vibrate(300);
+      vibrate(250);
 
       setHasRemoteStream(false);
       setIsConnected(false);
       setStatus("searching");
+
+      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     });
   }, []);
 
   // ---------------- ACTIONS ----------------
   const startCall = useCallback(async () => {
-    //  AUDIO UNLOCK (CRITICAL)
     joinAudioRef.current = new Audio("/assets/join.mp3");
     leaveAudioRef.current = new Audio("/assets/leave.mp3");
-    joinAudioRef.current.preload = "auto";
-    leaveAudioRef.current.preload = "auto";
 
-    // play & pause once to unlock
     joinAudioRef.current.play().then(() => {
       joinAudioRef.current?.pause();
       joinAudioRef.current!.currentTime = 0;
@@ -180,9 +190,6 @@ export const useVideoChat = () => {
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
 
-    remoteStreamRef.current = new MediaStream();
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-
     setHasRemoteStream(false);
     setIsConnected(false);
     setStatus("searching");
@@ -194,7 +201,7 @@ export const useVideoChat = () => {
 
   const endCall = useCallback(() => {
     leaveAudioRef.current?.play().catch(() => {});
-    vibrate(400);
+    vibrate(300);
 
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
