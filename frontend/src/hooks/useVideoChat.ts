@@ -56,27 +56,27 @@ export const useVideoChat = () => {
   }, []);
 
   // ---------------- PEER ----------------
-  const pc = new RTCPeerConnection({
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    {
-      urls: "turn:global.relay.metered.ca:80",
-      username: "YOUR_USERNAME",
-      credential: "YOUR_PASSWORD",
-    },
-    {
-      urls: "turn:global.relay.metered.ca:443",
-      username: "YOUR_USERNAME",
-      credential: "YOUR_PASSWORD",
-    },
-    {
-      urls: "turn:global.relay.metered.ca:443?transport=tcp",
-      username: "4d1a2e03c2879c896d2aa9fc",
-      credential: "lmKVk1svJmWyu7iS",
-    },
-  ],
-});
-
+  const setupPeerConnection = useCallback(() => {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        {
+          urls: "turn:global.relay.metered.ca:80",
+          username: "YOUR_USERNAME",
+          credential: "YOUR_PASSWORD",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443",
+          username: "YOUR_USERNAME",
+          credential: "YOUR_PASSWORD",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443?transport=tcp",
+          username: "4d1a2e03c2879c896d2aa9fc",
+          credential: "lmKVk1svJmWyu7iS",
+        },
+      ],
+    });
 
     peerConnectionRef.current = pc;
     remoteStreamRef.current = new MediaStream();
@@ -93,7 +93,10 @@ export const useVideoChat = () => {
         }
       });
 
-      if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStream) {
+      if (
+        remoteVideoRef.current &&
+        remoteVideoRef.current.srcObject !== remoteStream
+      ) {
         remoteVideoRef.current.srcObject = remoteStream;
         remoteVideoRef.current.playsInline = true;
         remoteVideoRef.current.play().catch(() => {});
@@ -184,10 +187,13 @@ export const useVideoChat = () => {
     joinAudioRef.current = new Audio("/assets/join.mp3");
     leaveAudioRef.current = new Audio("/assets/leave.mp3");
 
-    joinAudioRef.current.play().then(() => {
-      joinAudioRef.current?.pause();
-      joinAudioRef.current!.currentTime = 0;
-    }).catch(() => {});
+    joinAudioRef.current
+      .play()
+      .then(() => {
+        joinAudioRef.current?.pause();
+        joinAudioRef.current!.currentTime = 0;
+      })
+      .catch(() => {});
 
     const ok = await initCamera();
     if (!ok) return;
@@ -253,4 +259,5 @@ export const useVideoChat = () => {
     endCall,
   };
 };
+
 // ---------------- KHATAM ----------------
